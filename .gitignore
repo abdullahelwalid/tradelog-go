@@ -10,7 +10,7 @@
 
 # Test binary, built with `go test -c`
 *.test
-
+*.prof
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 
@@ -22,4 +22,4 @@ go.work
 
 .env
 
-main
+.DS_Store
