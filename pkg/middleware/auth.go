@@ -15,7 +15,7 @@ func Authentication(c *fiber.Ctx) error{
 	if (authHeader == "" || len(strings.Split(authHeader, " ")) < 2){
 		fmt.Println("NO AUTH HEADER")
 		c.SendStatus(401)
-		return c.SendString("Auth Header can't be empty")
+		return c.JSON(fiber.Map{"error": "Auth Header can't be empty"})
 	}
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
@@ -23,10 +23,12 @@ func Authentication(c *fiber.Ctx) error{
 		c.SendStatus(500)
 		return c.SendString("Something went wrong")
 	}
-	_, err = auth.ValidateToken(strings.Split(authHeader, " ")[1])
+	resp, err := auth.ValidateToken(strings.Split(authHeader, " ")[1])
 	if err != nil {
 		c.SendStatus(401)
 		return c.JSON(fiber.Map{"error": "Something went wrong when validating token"})
 	}
+	fmt.Println(*resp.Username)
+	c.Locals("username", *resp.Username) 
 	return c.Next()
 }

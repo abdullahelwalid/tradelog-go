@@ -10,5 +10,7 @@ func Test(c *fiber.Ctx) error {
 }
 
 func AuthHandler(c *fiber.Ctx) error {
-	return c.SendString("Auth Endpoint")
+	username := c.Locals("username")
+	c.SendStatus(200)
+	return c.JSON(fiber.Map{"username": username})
 }

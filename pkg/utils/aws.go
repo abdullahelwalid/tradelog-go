@@ -53,7 +53,9 @@ func (c *CognitoAuth) ValidateToken(token string) (*cognitoidentityprovider.GetU
 		AccessToken: aws.String(token),
 	}
 	resp, err := client.GetUser(context.TODO(), getUserInputFields)
-	fmt.Println(*resp.Username)	
+	if err == nil {
+		fmt.Println(*resp.Username)	
+	}
 	return resp, err
 }
 
@@ -66,7 +68,6 @@ func (c *CognitoAuth) Login(email string, password string) (*cognitoidentityprov
 		AuthParameters: authParams,
 	}
 	resp, err := client.InitiateAuth(context.TODO(), signInInput)
-	fmt.Println("response: ", err)
 	return resp, err
 }
 

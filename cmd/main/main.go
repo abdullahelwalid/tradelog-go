@@ -2,7 +2,7 @@ package main
 
 import (
 	"github.com/abdullahelwalid/tradelog-go/pkg/routes"
-	"github.com/abdullahelwalid/tradelog-go/pkg/utils"
+	//"github.com/abdullahelwalid/tradelog-go/pkg/utils"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/log"
 	"github.com/joho/godotenv"
@@ -17,7 +17,7 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 	//init DB
-	utils.InitDB()
+	//utils.InitDB()
 	log.Info("Server running on port 8000")
 	app.Listen(":8000")
 }
