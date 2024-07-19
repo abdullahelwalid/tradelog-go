@@ -43,30 +43,8 @@
     ],
     "cpu": "512",
     "memory": "1024",
-    "tags": [
-        {
-            "key": "",
-            "value": ""
-        }
-    ],
-    "pidMode": "host",
+	"pidMode": "host",
     "ipcMode": "host",
-    "proxyConfiguration": {
-        "type": "APPMESH",
-        "containerName": "",
-        "properties": [
-            {
-                "name": "",
-                "value": ""
-            }
-        ]
-    },
-    "inferenceAccelerators": [
-        {
-            "deviceName": "",
-            "deviceType": ""
-        }
-    ],
     "ephemeralStorage": {
         "sizeInGiB": 21
     },
