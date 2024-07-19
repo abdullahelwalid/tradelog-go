@@ -43,8 +43,6 @@
     ],
     "cpu": "512",
     "memory": "1024",
-	"pidMode": "host",
-    "ipcMode": "host",
     "ephemeralStorage": {
         "sizeInGiB": 21
     },
