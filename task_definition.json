@@ -6,7 +6,6 @@
     "containerDefinitions": [
         {
             "name": "tradelog",
-            "image": "930158188719.dkr.ecr.ap-southeast-1.amazonaws.com/test_repo:0.0.4",
             "cpu": 512,
             "portMappings": [
                 {
