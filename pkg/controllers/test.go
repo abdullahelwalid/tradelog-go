@@ -6,7 +6,7 @@ import (
 
 
 func Test(c *fiber.Ctx) error {
-	return c.SendString("Working hehehe 2.123")
+	return c.SendString("Test Github Actions")
 }
 
 func AuthHandler(c *fiber.Ctx) error {
