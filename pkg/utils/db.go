@@ -21,7 +21,7 @@ func InitDB() {
 		log.Fatal("failed to connect to the database:", err)
 	}
 
-	err = DB.AutoMigrate(&models.User{})
+	err = DB.AutoMigrate(&models.User{}, &models.Trade{})
 	if err != nil {
 		log.Fatal("failed to migrate database schema:", err)
 	}
