@@ -12,5 +12,6 @@ var MainRouter = func (app *fiber.App){
 	app.Get("/", controllers.Test)			
 	app.Post("/signup", controllers.SignUp)
 	app.Post("/confirmsignup", controllers.ConfirmSignUp)
+	app.Post("/resendConfirmationCode", controllers.ResendConfirmationCode)
 	app.Post("/login", controllers.Login)
 }
