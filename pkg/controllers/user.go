@@ -25,6 +25,13 @@ func SignUp(c *fiber.Ctx) error {
 			"error": "Cannot parse form data",
 		})
 	}
+	user := &models.User{}
+	utils.DB.First(user, "email = ?", data.Email)
+	if user.Email != "" {
+		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
+			"error": "Email already exist",
+		})
+	}
 	fmt.Println(data)
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
@@ -55,6 +62,16 @@ func ConfirmSignUp(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 			"error": "Cannot parse form data",
 		})
+	}
+	if (data.Code == "" || len(data.Code) == 0) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Code not in request",
+		})	
+	}
+	if (data.Email == "" || len(data.Code) == 0) {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Email not in request",
+		})	
 	}
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
@@ -104,10 +121,16 @@ func ResendConfirmationCode(c *fiber.Ctx) error {
 		Email string `form:"email"`
 	}
 	data := new(FormData)
-	if err := c.BodyParser(&data); err != nil{
+	if err := c.BodyParser(data); err != nil{
 		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
 				"error": "Cannot parse form data",
 			})
+	}
+	fmt.Println(data.Email)
+	if data.Email == "" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "Email not in request",
+		})	
 	}
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
