@@ -9,7 +9,7 @@ import (
 
 type Trade struct {
 	gorm.Model
-	TradId string `gorm:"primaryKey"`
+	TradId string `gorm:"primaryKey;column:trad_id"`
 	UserId string
 	Asset string
 	OpenPositionAt time.Time

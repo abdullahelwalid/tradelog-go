@@ -1,97 +1,184 @@
 package controllers
 
 import (
-	"fmt"
 	"strings"
-
+	"encoding/json"
+	"net/http"
 	"github.com/abdullahelwalid/tradelog-go/pkg/models"
 	"github.com/abdullahelwalid/tradelog-go/pkg/utils"
-	"github.com/gofiber/fiber/v2"
-	"github.com/google/uuid"
 )
 
-func SignUp(c *fiber.Ctx) error {
+func SignUp(w http.ResponseWriter, r *http.Request) {
+	// Define the struct to map the form data
 	type FormData struct {
-			Email    string `form:"email"`
-			Password string `form:"password"`
-			FullName string `form:"fullName"`
-			FirstName string `form:"firstName"`
-			LastName string `form:"lastName"`
-		}
-	data := new(FormData)
-	if err := c.BodyParser(data); err != nil {
-		fmt.Println(err)
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		Email     string `json:"email"`
+		Password  string `json:"password"`
+		FullName  string `json:"fullName"`
+		FirstName string `json:"firstName"`
+		LastName  string `json:"lastName"`
+	}
+
+	// Parse the form data
+	var data FormData
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&data); err != nil {
+		// Set response header to application/json
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Cannot parse form data",
 		})
+		return
 	}
+
+	// Validate that all fields are provided
+	if data.Email == "" || data.Password == "" || data.FullName == "" || data.FirstName == "" || data.LastName == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "All fields (email, password, fullName, firstName, lastName) are required",
+		})
+		return
+	}
+
+	// Check if the email already exists in the database
 	user := &models.User{}
 	utils.DB.First(user, "email = ?", data.Email)
 	if user.Email != "" {
-		return c.Status(fiber.StatusConflict).JSON(fiber.Map{
-			"error": "Email already exist",
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusConflict)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Email already exists",
 		})
+		return
 	}
-	fmt.Println(data)
+
+	// Initialize AWS config
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
-		c.SendStatus(500)
-		return c.SendString("Something went wrong")
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Something went wrong",
+		})
+		return
 	}
-	err = auth.Signup(data.Email, data.Password, &data.FirstName, &data.LastName, &data.FullName) 
+
+	// Perform the signup operation
+	err = auth.Signup(data.Email, data.Password, &data.FirstName, &data.LastName, &data.FullName)
 	if err != nil {
-		if (strings.Contains(err.Error(), "UsernameExistsException")) {
-			return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
-				"error": "Email already exist",
+		w.Header().Set("Content-Type", "application/json")
+		if strings.Contains(err.Error(), "UsernameExistsException") {
+			w.WriteHeader(http.StatusConflict)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Email already exists",
+			})
+		} else {
+			w.WriteHeader(http.StatusBadRequest)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": err.Error(),
 			})
 		}
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-			"error": err.Error(),
-			})	
-		}
-	return c.SendString("sign up successful")
+		return
+	}
+
+	// Respond with success in JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Send success message in JSON
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Sign up successful",
+	})
 }
 
-func ConfirmSignUp(c *fiber.Ctx) error {
+
+func ConfirmSignUp(w http.ResponseWriter, r *http.Request) {
+	// Define the struct to map the form data
 	type FormData struct {
-		Email string `form:"email"`
-		Code string `form:"code"`
+		Email string `json:"email"`
+		Code  string `json:"code"`
 	}
-	data := new(FormData)
-	if err := c.BodyParser(data); err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+
+	// Parse the form data
+	var data FormData
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&data); err != nil {
+		// Set response header to application/json
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Cannot parse form data",
 		})
+		return
 	}
-	if (data.Code == "" || len(data.Code) == 0) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+
+	// Validate that the code is provided
+	if data.Code == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Code not in request",
-		})	
+		})
+		return
 	}
-	if (data.Email == "" || len(data.Code) == 0) {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+
+	// Validate that the email is provided
+	if data.Email == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Email not in request",
-		})	
+		})
+		return
 	}
+
+	// Initialize AWS config
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": err.Error(),
-		})	
+		})
+		return
 	}
+
+	// Perform the confirm sign-up operation
 	err = auth.ConfirmSignUp(data.Email, data.Code)
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": err.Error(),
-			})	
-		}
+		})
+		return
+	}
+
+	// Retrieve user attributes after confirmation
 	resp, err := auth.AdminGetUser(data.Email)
 	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "An error has occurred while verifying your account",
 		})
+		return
 	}
-	var firstName, lastName, fullName *string
+
+	// Extract user attributes
+	var firstName, lastName, fullName, username *string
 	for _, att := range resp.UserAttributes {
 		if *att.Name == "given_name" {
 			firstName = att.Value
@@ -103,72 +190,161 @@ func ConfirmSignUp(c *fiber.Ctx) error {
 			fullName = att.Value
 		}
 	}
-	userId := uuid.New()	
-	//Add user info to database
-	user := models.User{UserId: userId.String(), Email: data.Email, FirstName: *firstName, FullName: *fullName, LastName: *lastName}
+	username = resp.Username
+
+	// Add user info to database
+	user := models.User{
+		UserId:   *username,
+		Email:    data.Email,
+		FirstName: *firstName,
+		FullName:  *fullName,
+		LastName:  *lastName,
+	}
 	result := utils.DB.Create(&user)
 	if result.Error != nil {
-		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "An error has occurred while creating your account",
 		})
+		return
 	}
 
-	return c.SendString("sign up successful")
+	// Respond with success in JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Send success message in JSON
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Sign up successful",
+	})
 }
 
-func ResendConfirmationCode(c *fiber.Ctx) error {
+func ResendConfirmationCode(w http.ResponseWriter, r *http.Request) {
+	// Define the struct to map the form data
 	type FormData struct {
-		Email string `form:"email"`
+		Email string `json:"email"`
 	}
-	data := new(FormData)
-	if err := c.BodyParser(data); err != nil{
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Cannot parse form data",
-			})
+
+	// Parse the form data
+	var data FormData
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&data); err != nil {
+		// Set response header to application/json
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Cannot parse form data",
+		})
+		return
 	}
-	fmt.Println(data.Email)
+
+	// Validate that email is provided
 	if data.Email == "" {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": "Email not in request",
-		})	
+		})
+		return
 	}
+
+	// Initialize AWS config
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": err.Error(),
-		})	}
+		})
+		return
+	}
+
+	// Resend the confirmation code
 	err = auth.ResendConfirmationCode(data.Email)
 	if err != nil {
-		c.SendStatus(fiber.StatusForbidden)
-		return c.JSON(fiber.Map{"error": "An error has occurred while resending confirmation code"})
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "An error has occurred while resending confirmation code",
+		})
+		return
 	}
 
-	c.SendStatus(fiber.StatusOK)
-	return c.JSON(fiber.Map{
-		"message": "code sent successfully",
-	})	
+	// Respond with success in JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Send success message in JSON
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Code sent successfully",
+	})
 }
 
-func Login(c *fiber.Ctx) error {
+func Login(w http.ResponseWriter, r *http.Request) {
+	// Define the struct to map the form data
 	type FormData struct {
-		Email string `form:"email"`
-		Password string `form:"password"`
+		Email    string `json:"email"`
+		Password string `json:"password"`
 	}
+
+	// Parse the form data
 	var data FormData
-		if err := c.BodyParser(&data); err != nil {
-			return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
-				"error": "Cannot parse form data",
-			})
-		}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&data); err != nil {
+		// Set response header to application/json
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Cannot parse form data",
+		})
+		return
+	}
+
+	// Validate that email is provided
+	if data.Email == "" {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Email is required",
+		})
+		return
+	}
+
+	// Initialize AWS config
 	auth, err := utils.InitAWSConfig()
 	if err != nil {
-		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
 			"error": err.Error(),
-		})	}
-	resp, err := auth.Login(data.Email, data.Password)
-	if err != nil {
-		c.SendStatus(401)
-		return c.JSON(fiber.Map{"error": "Invalid credentials"})
+		})
+		return
 	}
-	return c.JSON(resp)
+
+	// Perform the login operation
+	_, err = auth.Login(data.Email, data.Password)
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid credentials",
+		})
+		return
+	}
+
+	// Respond with success message in JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	// Send success message in JSON
+	json.NewEncoder(w).Encode(map[string]string{
+		"message": "Login successful! Welcome, " + data.Email + ".",
+	})
 }
