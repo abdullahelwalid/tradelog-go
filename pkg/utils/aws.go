@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider"
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 
 
@@ -45,6 +46,19 @@ func computeSecretHash(clientSecret string, username string, clientId string) st
 	mac.Write([]byte(username + clientId))
 
 	return base64.StdEncoding.EncodeToString(mac.Sum(nil))
+}
+
+func (c *CognitoAuth) AdminGetUser(username string) (*cognitoidentityprovider.AdminGetUserOutput, error) {
+	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	userInput := &cognitoidentityprovider.AdminGetUserInput{
+		UserPoolId: &c.UserPoolID,
+		Username: &username,
+	}
+	resp, err := client.AdminGetUser(context.TODO(), userInput)
+	if (err != nil) {
+		fmt.Println(err)
+	}
+	return resp, err
 }
 
 func (c *CognitoAuth) ValidateToken(token string) (*cognitoidentityprovider.GetUserOutput, error) {
@@ -84,13 +98,35 @@ func (c *CognitoAuth) ConfirmSignUp(email string, code string) error {
 	return err
 }
 
-func (c *CognitoAuth) Signup(email string, password string) error {
+func (c *CognitoAuth) ResendConfirmationCode(email string) error {
 	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	input := cognitoidentityprovider.ResendConfirmationCodeInput{
+		ClientId: &c.AppClientID,
+		Username: &email,
+		SecretHash: aws.String(computeSecretHash(c.AppClientSecret, email, c.AppClientID)),
+	}
+	_, err := client.ResendConfirmationCode(context.TODO(), &input)
+	return err
+}
+
+func (c *CognitoAuth) Signup(email string, password string, firstName *string, lastName *string, fullName *string) error {
+	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	type signUpAttributes struct {
+		givenName string
+		familyName string
+		name string
+	}
+	signUpAttributesInput := signUpAttributes{givenName: "given_name", familyName: "family_name", name: "name"}
+	firstname := types.AttributeType{Name: &signUpAttributesInput.givenName, Value: firstName}	
+	lastname := types.AttributeType{Name: &signUpAttributesInput.familyName, Value: lastName}
+	fullname := types.AttributeType{Name: &signUpAttributesInput.name, Value: fullName}
+	userAttributes := []types.AttributeType{firstname, lastname, fullname}
 	signUpInput := &cognitoidentityprovider.SignUpInput{
 		ClientId: &c.AppClientID,
 		Username: aws.String(email),
 		Password: aws.String(password),
 		SecretHash: aws.String(computeSecretHash(c.AppClientSecret, email, c.AppClientID)),
+		UserAttributes: userAttributes,
 	}
 	resp, err := client.SignUp(context.TODO(), signUpInput)
 	if err != nil {

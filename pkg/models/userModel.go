@@ -5,7 +5,10 @@ import "gorm.io/gorm"
 
 type User struct {
 	gorm.Model
+	UserId string `gorm:"primaryKey;unique"`
 	FirstName string
-	Email string `gorm:"unique"`
 	LastName string
+	FullName string
+	Email string `gorm:"unique"`
+	Trades []Trade `gorm:"foreignKey:UserId;references:UserId"` 
 }

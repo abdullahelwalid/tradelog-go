@@ -1,16 +1,36 @@
 package controllers
 
 import (
-	"github.com/gofiber/fiber/v2"
+	"encoding/json"
+	"fmt"
+	"net/http"
 )
 
-
-func Test(c *fiber.Ctx) error {
-	return c.SendString("Test Github Actions")
+// TestHandler returns a simple string message
+func TestHandler(w http.ResponseWriter, r *http.Request) {
+	// Set the response content type to plain text
+	w.Header().Set("Content-Type", "application/plain")
+	w.WriteHeader(http.StatusOK) // Send HTTP status 200
+	fmt.Fprintln(w, "Test Github Actions") // Send response body
 }
 
-func AuthHandler(c *fiber.Ctx) error {
-	username := c.Locals("username")
-	c.SendStatus(200)
-	return c.JSON(fiber.Map{"username": username})
+// AuthHandler returns the username from the request context as JSON
+func AuthHandler(w http.ResponseWriter, r *http.Request) {
+	// Get the username from the request context
+	username := r.Context().Value("username")
+
+	// Set the response content type to JSON
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK) // Send HTTP status 200
+
+	// Create the response map
+	resp := map[string]interface{}{
+		"username": username,
+	}
+
+	// Encode the response as JSON and write it to the response writer
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
