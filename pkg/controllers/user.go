@@ -1,11 +1,19 @@
 package controllers
 
 import (
-	"strings"
+	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
+
 	"github.com/abdullahelwalid/tradelog-go/pkg/models"
+	authTypes "github.com/abdullahelwalid/tradelog-go/pkg/types"
 	"github.com/abdullahelwalid/tradelog-go/pkg/utils"
+
+	"github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 )
 
 func SignUp(w http.ResponseWriter, r *http.Request) {
@@ -266,6 +274,24 @@ func ResendConfirmationCode(w http.ResponseWriter, r *http.Request) {
 	// Resend the confirmation code
 	err = auth.ResendConfirmationCode(data.Email)
 	if err != nil {
+		var errTR *types.TooManyRequestsException
+		var errTMFA *types.TooManyFailedAttemptsException
+		w.Header().Set("Content-Type", "application/json")
+		if errors.As(err, &errTR){
+			w.WriteHeader(http.StatusTooManyRequests)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Requests",
+			})
+			return
+		}
+		if errors.As(err, &errTMFA){
+			w.WriteHeader(http.StatusUnauthorized)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Failed Attempts",
+			})
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusForbidden)
 		// Send error message in JSON
@@ -273,8 +299,8 @@ func ResendConfirmationCode(w http.ResponseWriter, r *http.Request) {
 			"error": "An error has occurred while resending confirmation code",
 		})
 		return
-	}
 
+	}
 	// Respond with success in JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -329,8 +355,48 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Perform the login operation
-	_, err = auth.Login(data.Email, data.Password)
+	resp, err := auth.Login(data.Email, data.Password)
 	if err != nil {
+		var errIC *types.InvalidPasswordException
+		var errTR *types.TooManyRequestsException
+		var errTMFA *types.TooManyFailedAttemptsException
+		w.Header().Set("Content-Type", "application/json")
+		if errors.As(err, &errIC){
+			w.WriteHeader(http.StatusUnauthorized)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Invalid credentials",
+			})
+			return
+		}
+		if errors.As(err, &errTR){
+			w.WriteHeader(http.StatusTooManyRequests)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Requests",
+			})
+			return
+		}
+		if errors.As(err, &errTMFA){
+			w.WriteHeader(http.StatusUnauthorized)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Failed Attempts",
+			})
+		}
+		w.WriteHeader(http.StatusUnauthorized)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Invalid credentials",
+		})
+		return
+	}
+
+
+	user := &models.User{}
+	utils.DB.First(user, "email = ?", data.Email)
+
+	if user.Email == "" {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusUnauthorized)
 		// Send error message in JSON
@@ -340,11 +406,96 @@ func Login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+
+
+	
+	authData := &authTypes.AuthCookies{
+		RefreshToken: *resp.AuthenticationResult.RefreshToken,
+		AccessToken: *resp.AuthenticationResult.AccessToken,
+		Email: user.Email,
+		Username: user.UserId,
+	}
+	authDataSerialized, err := json.Marshal(authData)
+	if err != nil{
+		fmt.Println(err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		// Send error message in JSON
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "An error has occurred while generating auth data",
+		})
+		return
+
+	}
+	authDataCookie := &http.Cookie{
+		Name: "authData",
+		Value: base64.StdEncoding.EncodeToString(authDataSerialized),
+		Expires: time.Now().AddDate(0, 0, 30),
+	}
+	http.SetCookie(w, authDataCookie)
 	// Respond with success message in JSON
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	// Send success message in JSON
 	json.NewEncoder(w).Encode(map[string]string{
-		"message": "Login successful! Welcome, " + data.Email + ".",
+		"userId": user.UserId,
+		"firstName": user.FirstName,
+		"lastName": user.LastName,
+		"fullName": user.FullName,
 	})
+	return
+}
+
+
+func forgotPassword(w http.ResponseWriter, r *http.Request) {
+	type formData struct{
+		Email string `json:"email"`
+	}
+
+	var data formData
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&data); err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Cannot parse JSON data",
+		})
+	}
+	auth, err := utils.InitAWSConfig()
+	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Internal Server Error",
+		})
+	}
+
+	err = auth.ForgotPassword(&data.Email)
+	
+
+	if err != nil {
+		var errTR *types.TooManyRequestsException
+		var errTMFA *types.TooManyFailedAttemptsException
+		w.Header().Set("Content-Type", "application/json")
+		if errors.As(err, &errTR){
+			w.WriteHeader(http.StatusTooManyRequests)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Requests",
+			})
+			return
+		}
+		if errors.As(err, &errTMFA){
+			w.WriteHeader(http.StatusUnauthorized)
+			// Send error message in JSON
+			json.NewEncoder(w).Encode(map[string]string{
+				"error": "Too Many Failed Attempts",
+			})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Internal Server Error",
+		})
+	}
 }
