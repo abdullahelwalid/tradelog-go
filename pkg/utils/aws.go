@@ -73,6 +73,18 @@ func (c *CognitoAuth) ValidateToken(token string) (*cognitoidentityprovider.GetU
 	return resp, err
 }
 
+func (c *CognitoAuth) RefreshToken(refreshToken string, email string) (*cognitoidentityprovider.InitiateAuthOutput, error) {
+	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	authParams := map[string]string{"USERNAME": refreshToken, "SECRET_HASH": computeSecretHash(c.AppClientSecret, email, c.AppClientID)}
+	signInInput := &cognitoidentityprovider.InitiateAuthInput{
+		AuthFlow: "REFRESH_TOKEN",
+		ClientId: &c.AppClientID,
+		AuthParameters: authParams,
+	}
+	resp, err := client.InitiateAuth(context.TODO(), signInInput)
+	return resp, err
+}
+
 func (c *CognitoAuth) Login(email string, password string) (*cognitoidentityprovider.InitiateAuthOutput, error) {
 	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
 	authParams := map[string]string{"USERNAME": email, "PASSWORD": password, "SECRET_HASH": computeSecretHash(c.AppClientSecret, email, c.AppClientID)}
@@ -135,4 +147,30 @@ func (c *CognitoAuth) Signup(email string, password string, firstName *string, l
 	}
 	fmt.Println(resp)
 	return nil
+}
+
+func (c *CognitoAuth) ForgotPassword(email *string) error {
+	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	forgotPasswordInput := &cognitoidentityprovider.ForgotPasswordInput{
+		Username: email,
+		ClientId: &c.AppClientID,
+		SecretHash: aws.String(computeSecretHash(c.AppClientSecret, *email, c.AppClientID)),
+	}
+	resp, err := client.ForgotPassword(context.TODO(), forgotPasswordInput)
+	fmt.Println(resp)
+	return err
+}
+
+func (c *CognitoAuth) ConfirmForgotPassword(code *string, password *string, email *string) error {
+	client := cognitoidentityprovider.NewFromConfig(c.Cfg)
+	confirmPasswordInput := &cognitoidentityprovider.ConfirmForgotPasswordInput{
+		ClientId: &c.AppClientID,
+		ConfirmationCode: code,
+		Password: password,
+		SecretHash: aws.String(computeSecretHash(c.AppClientSecret, *email, c.AppClientID)),
+		Username: email,
+	}
+	resp, err := client.ConfirmForgotPassword(context.TODO(), confirmPasswordInput)
+	fmt.Println(resp)
+	return err
 }
