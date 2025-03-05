@@ -315,6 +315,7 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	type FormData struct {
 		Email    string `json:"email"`
 		Password string `json:"password"`
+		AuthFlow string `json:"authFlow"`
 	}
 
 	// Parse the form data
@@ -437,17 +438,27 @@ func Login(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	// Send success message in JSON
-	json.NewEncoder(w).Encode(map[string]string{
-		"userId": user.UserId,
-		"firstName": user.FirstName,
-		"lastName": user.LastName,
-		"fullName": user.FullName,
-	})
+	if (data.AuthFlow == ""){
+		json.NewEncoder(w).Encode(map[string]string{
+			"userId": user.UserId,
+			"firstName": user.FirstName,
+			"lastName": user.LastName,
+			"fullName": user.FullName,
+		})
+	} else {
+		json.NewEncoder(w).Encode(map[string]string{
+			"userId": user.UserId,
+			"firstName": user.FirstName,
+			"lastName": user.LastName,
+			"fullName": user.FullName,
+			"accessToken": *resp.AuthenticationResult.AccessToken,
+		})
+	}
 	return
 }
 
 
-func forgotPassword(w http.ResponseWriter, r *http.Request) {
+func ForgotPassword(w http.ResponseWriter, r *http.Request) {
 	type formData struct{
 		Email string `json:"email"`
 	}
@@ -498,4 +509,27 @@ func forgotPassword(w http.ResponseWriter, r *http.Request) {
 			"error": "Internal Server Error",
 		})
 	}
+}
+
+func GetProfile(w http.ResponseWriter, r *http.Request){
+	username, _ := r.Context().Value("username").(string)
+	user := &models.User{UserId: username}
+	utils.DB.First(user)
+	w.Header().Set("Content-Type", "application/json")
+	if (user.Email == ""){
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{
+			"error": "Internal Server Error user not found",
+		})
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(map[string]string{
+		"email": user.Email,
+		"firstName": user.FirstName,
+		"lastName": user.LastName,
+		"fullName": user.FullName,
+		"profilePictureURL": user.ProfileUrl,
+	})
+	return
 }

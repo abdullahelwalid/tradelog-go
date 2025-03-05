@@ -21,6 +21,6 @@ var Mux = func() (*http.ServeMux){
 	// Protected routes
 	mux.Handle("/auth", middleware.MethodCheckMiddleware(middleware.AuthenticationMiddleware(http.HandlerFunc(controllers.AuthHandler)), []string{http.MethodGet}))
 	mux.Handle("/trade", middleware.MethodCheckMiddleware(middleware.AuthenticationMiddleware(http.HandlerFunc(controllers.AddTrade)), []string{http.MethodPost}))
-		
+	mux.Handle("/profile", middleware.MethodCheckMiddleware(middleware.AuthenticationMiddleware(http.HandlerFunc(controllers.GetProfile)), []string{http.MethodGet}))
 	return mux
 }

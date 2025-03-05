@@ -10,5 +10,6 @@ type User struct {
 	LastName string
 	FullName string
 	Email string `gorm:"unique"`
+	ProfileUrl string
 	Trades []Trade `gorm:"foreignKey:UserId;references:UserId"` 
 }
